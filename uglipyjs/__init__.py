@@ -29,8 +29,8 @@ class UglipyJS:
     	}
   	}
 
-	source_path = os.path.abspath(os.path.relpath("uglipyjs/uglify.js"))
-  	es5_fallback_path = os.path.abspath(os.path.relpath("uglipyjs/es5.js"))
+	source_path = os.path.join(os.path.dirname(__file__), 'uglify.js')
+  	es5_fallback_path = os.path.join(os.path.dirname(__file__), 'es5.js')
   	
   	# Initialize new context for UgliPyJS with given options
   	#

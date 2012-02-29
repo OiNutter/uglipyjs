@@ -5,5 +5,10 @@ setup(name='UgliPyJS',
 	  description='Python wrapper for Uglify-JS library.',
 	  author='Will McKenzie',
 	  author_email='will@oinutter.co.uk',
-	  packages=['PyV8','PyExecJS']
+	  packages=['uglipyjs'],
+	  package_dir={'uglipyjs': 'uglipyjs'},
+      package_data={
+        'uglipyjs': ['*.js'],
+      },
+	  requires=['PyV8','ordereddict','PyExecJS']
 	  )
