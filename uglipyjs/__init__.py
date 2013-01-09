@@ -2,7 +2,6 @@ import execjs
 import json
 import os
 import io
-import re
 
 class UglipyJS:
 
@@ -10,7 +9,7 @@ class UglipyJS:
 
 	# Default options for compilation
 	__DEFAULTS__ = {
-    'encoding':'utf8',
+    	'encoding':'utf8',
 		'mangle': True, # Mangle variable and function names, use :vars to skip function mangling
 		'except': ["$super"], # Variable names to be excluded from mangling
 		'max_line_length': 32 * 1024, # Maximum line length
@@ -42,10 +41,10 @@ class UglipyJS:
 	# Initialize new context for UgliPyJS with given options
 	#
 	# options - Hash of options to override UgliPyJS.DEFAULTS
-	def __init__(self, options = {}):
-		defaults = UglipyJS.__DEFAULTS__
+	def __init__(self, options = None):
 		self._options = UglipyJS.__DEFAULTS__
-		self._options.update(options)
+		if options:
+			self._options.update(options)
 		self._context = execjs.compile(io.open(UglipyJS.es5_fallback_path, "r",encoding=self._options['encoding']).read() + io.open(UglipyJS.source_path, "r",encoding=self._options['encoding']).read())
 
 	def compile(self,source):
