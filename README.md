@@ -1,4 +1,4 @@
-gliPyJs
+UgliPyJs
 ========
 
 UgliPyJs is a port of the [uglifier][] gem for python. It wraps the
