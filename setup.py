@@ -7,7 +7,7 @@ doc = pandoc.Document()
 doc.markdown = open('README.md','r').read()
 
 setup(name='UgliPyJS',
-      version='0.2.1',
+      version='0.2.2',
       url='https://github.com/OiNutter/uglipyjs',
       download_url='https://github.com/OiNutter/uglipyjs/tarball/master',
       description='Python wrapper for Uglify-JS library.',
