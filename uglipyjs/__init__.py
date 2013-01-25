@@ -60,7 +60,10 @@ class UglipyJS:
 	#
 	# Returns minified code as String
 	def really_compile(self,source,generate_map):
-		source = unicode(source,self._options['encoding']) if isinstance(source,unicode) or isinstance(source,str) else source.read()
+		if isinstance(source, str):
+			source = unicode(source, self._options['encoding'])
+		elif hasattr(source, "read"):
+			source = source.read()
 
 		source = source.replace('\t',' ')
 
