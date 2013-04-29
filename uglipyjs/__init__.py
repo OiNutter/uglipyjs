@@ -61,7 +61,10 @@ class UglipyJS:
 	# Returns minified code as String
 	def really_compile(self,source,generate_map):
 		if isinstance(source, str):
-			source = unicode(source, self._options['encoding'])
+			try:
+				source = unicode(source, self._options['encoding'])
+			except:
+				source = source
 		elif hasattr(source, "read"):
 			source = source.read()
 
