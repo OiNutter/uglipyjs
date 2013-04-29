@@ -68,6 +68,7 @@ class UglipyJS:
 		elif hasattr(source, "read"):
 			source = source.read()
 
+		source = source.replace('\\xa0', ' ')
 		source = source.replace('\t',' ')
 
 		js = """var options = %s;
@@ -126,7 +127,7 @@ if (options.generate_map) {
 
 		}
 
-		return self._context.exec_(js % json.dumps(options))
+		return self._context.exec_(js % json.dumps(options)).encode(self._options['encoding'])
 
 	def should_mangle(self):
 		return not not self._options['mangle']
