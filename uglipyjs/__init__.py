@@ -33,6 +33,7 @@ class UglipyJS:
 		'source_root': None, # The URL of the directory which contains :source_filename
 		'output_filename': None, # The filename or URL where the minified output can be found
 		'input_source_map': None, # The contents of the source map describing the input
+        'compress': {}
 	}
 
 	source_path = os.path.join(os.path.dirname(__file__), 'uglify.js')
@@ -123,8 +124,7 @@ if (options.generate_map) {
 			"squeeze":self.should_squeeze(),
 			"mangle":self.should_mangle(),
 			"copyright":self.preserve_copyright(),
-
-
+			"compress": self._options['compress']
 		}
 
 		return self._context.exec_(js % json.dumps(options)).encode(self._options['encoding'])
