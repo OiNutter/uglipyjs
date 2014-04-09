@@ -37,6 +37,7 @@ class UglipyJS:
     }
 
     source_path = os.path.join(os.path.dirname(__file__), 'uglify.js')
+    source_map_path = os.path.join(os.path.dirname(__file__), 'source-map.min.js')
     es5_fallback_path = os.path.join(os.path.dirname(__file__), 'es5.js')
 
     # Initialize new context for UgliPyJS with given options
@@ -46,7 +47,12 @@ class UglipyJS:
         self._options = UglipyJS.__DEFAULTS__
         if options:
             self._options.update(options)
-        self._context = execjs.compile(io.open(UglipyJS.es5_fallback_path, "r",encoding=self._options['encoding']).read() + io.open(UglipyJS.source_path, "r",encoding=self._options['encoding']).read())
+        self._context = execjs.compile(
+            io.open(UglipyJS.es5_fallback_path, "r",encoding=self._options['encoding']).read() + ";"
+            + io.open(UglipyJS.source_map_path, "r",encoding=self._options['encoding']).read() + ";"
+			+ "var MOZ_SourceMap = this.sourceMap;"
+            + io.open(UglipyJS.source_path, "r",encoding=self._options['encoding']).read()
+        )
 
     def compile(self,source):
         return self.really_compile(source,False)
