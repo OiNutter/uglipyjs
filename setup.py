@@ -6,7 +6,7 @@ if os.path.exists('README.txt'):
       long_description = open('README.txt').read()
 
 setup(name='UgliPyJS',
-      version='0.2.3',
+      version='0.2.5',
       url='https://github.com/OiNutter/uglipyjs',
       download_url='https://github.com/OiNutter/uglipyjs/tarball/master',
       description='Python wrapper for Uglify-JS library.',
