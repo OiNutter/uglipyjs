@@ -1,7 +1,8 @@
-import execjs
+import PyV8
 import json
 import os
 import io
+from chardet.universaldetector import UniversalDetector
 
 class UglipyJS:
 
@@ -9,31 +10,55 @@ class UglipyJS:
 
     # Default options for compilation
     __DEFAULTS__ = {
-    	'encoding':'utf8',
-        'mangle': True, # Mangle variable and function names, use :vars to skip function mangling
-        'except': ["$super"], # Variable names to be excluded from mangling
-        'max_line_length': 32 * 1024, # Maximum line length
-        'squeeze': True, # Squeeze code resulting in smaller, but less-readable code
-        'seqs': True, # Reduce consecutive statements in blocks into single statement
-        'dead_code': True, # Remove dead code (e.g. after return)
-        'lift_vars': False, # Lift all var declarations at the start of the scope
-        'unsafe': False, # Optimizations known to be unsafe in some situations
-        'copyright': True, # Show copyright message
-        'ascii_only': False, # Encode non-ASCII characters as Unicode code points
-        'inline_script': False, # Escape </script
-        'quote_keys': False, # Quote keys in object literals
-        'define': {}, # Define values for symbol replacement
-        'beautify': False, # Ouput indented code
-        'beautify_options': {
-            'indent_level': 4,
-            'indent_start': 0,
-            'space_colon': False
+    	"encoding": "utf8",
+        "warnings": False,
+        "mangle": {}, # Mangle variable and function names, use :vars to skip function mangling
+        "from_string": False,
+        "source_root": None, # The URL of the directory which contains :source_filename
+        "input_source_map": None, # The contents of the source map describing the input
+        "output_source_map": None, # The output filename for the minified source map
+
+        # output options
+        "output": {
+            "indent_start"  : 0,     # start indentation on every line (only when 'beautify')
+            "indent_level"  : 4,     # indentation level (only when `beautify`)
+            "quote_keys"    : False, # quote all keys in object literals?
+            "space_colon"   : True,  # add a space after colon signs?
+            "ascii_only"    : False, # output ASCII-safe? (encodes Unicode characters as ASCII)
+            "inline_script" : False, # escape "</script"?
+            "width"         : 80,    # informative maximum line width (for beautified output)
+            "max_line_len"  : 32000, # maximum line length (for non-beautified output)
+            #"ie_proof"      : True,  # output IE-safe code?
+            "beautify"      : False, # beautify output?
+            "source_map"    : None,  # output a source map
+            "bracketize"    : False, # use brackets every time?
+            "comments"      : False, # output comments?
+            "semicolons"    : True   # use semicolons to separate statements? (otherwise, newlines)
         },
-        'source_filename': None, # The filename of the input
-        'source_root': None, # The URL of the directory which contains :source_filename
-        'output_filename': None, # The filename or URL where the minified output can be found
-        'input_source_map': None, # The contents of the source map describing the input
-        'compress': {}
+
+        # compressor options
+        "compressor": {
+            "sequences"     : True,  # join consecutive statemets with the "comma operator"
+            "properties"    : True,  # optimize property access: a["foo"] -> a.foo
+            "dead_code"     : True,  # discard unreachable code
+            "drop_debugger" : True,  # discard "debugger" statements
+            "unsafe"        : False, # some unsafe optimizations (see below)
+            "conditionals"  : True,  # optimize if-s and conditional expressions
+            "comparisons"   : True,  # optimize comparisons
+            "evaluate"      : True,  # evaluate constant expressions
+            "booleans"      : True,  # optimize boolean expressions
+            "loops"         : True,  # optimize loops
+            "unused"        : True,  # drop unused variables/functions
+            "hoist_funs"    : True,  # hoist function declarations
+            "hoist_vars"    : False, # hoist variable declarations
+            "if_return"     : True,  # optimize if-s followed by return/continue
+            "join_vars"     : True,  # join var declarations
+            "cascade"       : True,  # try to cascade 'right' into 'left' in sequences
+            "side_effects"  : True,  # drop side-effect-free statements
+            "warnings"      : True,  # warn about potentially dangerous optimizations/code
+            "global_defs"   : {}     # global definitions
+        }
+        
     }
 
     source_path = os.path.join(os.path.dirname(__file__), 'uglify.js')
@@ -45,14 +70,40 @@ class UglipyJS:
     # options - Hash of options to override UgliPyJS.DEFAULTS
     def __init__(self, options = None):
         self._options = UglipyJS.__DEFAULTS__
+
         if options:
+            output = None
+            compressor = None
+
+            if "output" in options:
+                output = self._options['output']
+                output.update(options['output'])
+                del self._options['output']
+                del options['output']
+
+            if "compressor" in options:
+                compressor = self._options['compressor']
+                compressor.update(options['compressor'])
+                del self._options['compressor']
+                del options['compressor']
+
             self._options.update(options)
-        self._context = execjs.compile(
-            io.open(UglipyJS.es5_fallback_path, "r",encoding=self._options['encoding']).read() + ";"
-            + io.open(UglipyJS.source_map_path, "r",encoding=self._options['encoding']).read() + ";"
-			+ "var MOZ_SourceMap = this.sourceMap;"
-            + io.open(UglipyJS.source_path, "r",encoding=self._options['encoding']).read()
-        )
+
+            if output:
+                self._options['output'] = output            
+
+            if compressor:
+                self._options['compressor'] = compressor
+
+        self.env = ";\n".join([
+                io.open(UglipyJS.es5_fallback_path, "r",encoding=self._options['encoding']).read(),
+                io.open(UglipyJS.source_map_path, "r",encoding=self._options['encoding']).read(),
+                "var MOZ_SourceMap = this.sourceMap",
+                io.open(UglipyJS.source_path, "r",encoding=self._options['encoding']).read()
+            ])
+
+        self.env.replace(';;',';')
+        self._context = PyV8.JSContext()
 
     def compile(self,source):
         return self.really_compile(source,False)
@@ -66,138 +117,112 @@ class UglipyJS:
     # source should be a String or IO object containing valid JavaScript.
     #
     # Returns minified code as String
-    def really_compile(self,source,generate_map):
-        if isinstance(source, str):
-            try:
-                source = unicode(source, self._options['encoding'])
-            except:
-                source = source
-        elif hasattr(source, "read"):
-            source = source.read()
+    def really_compile(self,source,generate_map):   
 
-        source = source.replace('\\xa0', ' ')
-        source = source.replace('\t',' ')
+        #source = source.replace('\\xa0', ' ')
+        #source = source.replace('\t',' ')
 
-        js = """var options = %s;
-var source = options.source;
-var ast = UglifyJS.parse(source, options.parse_options);
-ast.figure_out_scope();
+        js = """var files = %s,
+                    options = UglifyJS.defaults(%s, {
+                        spidermonkey : false,
+                        outSourceMap : null,
+                        sourceRoot   : null,
+                        inSourceMap  : null,
+                        fromString   : false,
+                        warnings     : false,
+                        mangle       : {},
+                        output       : null,
+                        compress     : {}
+                    });
 
-if (options.squeeze) {
-    var compressor = UglifyJS.Compressor(options.compressor_options);
-    ast = ast.transform(compressor);
-    ast.figure_out_scope();
-}
+                UglifyJS.base54.reset();
 
-if (options.mangle) {
-    ast.compute_char_frequency();
-    ast.mangle_names(options.mangle_options);
-}
+                // 1. parse
+                var toplevel = null,
+                    sourcesContent = {};
 
-var gen_code_options = options.gen_code_options;
+                if (typeof files == "string")
+                    files = [ files ];
+            
+                files.forEach(function(file){
+                    var code = file
+                    
+                    sourcesContent[file] = code;
+                    toplevel = UglifyJS.parse(code, {
+                        filename: options.fromString ? "?" : file,
+                        toplevel: toplevel
+                    });
+                });
 
-if (options.generate_map) {
-    var source_map = UglifyJS.SourceMap(options.source_map_options);
-    gen_code_options.source_map = source_map;
-}
+                // 2. compress
+                if (options.compress) {
+                    var compress = { warnings: options.warnings };
+                    UglifyJS.merge(compress, options.compress);
+                    toplevel.figure_out_scope();
+                    var sq = UglifyJS.Compressor(compress);
+                    toplevel = toplevel.transform(sq);
+                }
 
-var stream = UglifyJS.OutputStream(gen_code_options);
+                // 3. mangle
+                if (options.mangle) {
+                    toplevel.figure_out_scope();
+                    toplevel.compute_char_frequency();
+                    toplevel.mangle_names(options.mangle);
+                }
 
-if (options.copyright) {
-    var comments = ast.start.comments_before;
-    for (var i = 0; i < comments.length; i++) {
-        var c = comments[i];
-        stream.print((c.type == "comment1") ? "//"+c.value+"\\n" : "/*"+c.value+"*/\\n");
-    }
-}
+                // 4. output
+                var inMap = options.inSourceMap;
+                var output = {};
+                if (typeof options.inSourceMap == "string") {
+                    inMap = options.inSourceMap;
+                }
 
-ast.print(stream);
-if (options.generate_map) {
-    return [stream.toString() + ";", source_map.toString()];
-} else {
-    return stream.toString() + ";";
-}
-                """
+                if (options.outSourceMap) {
+                    output.source_map = UglifyJS.SourceMap({
+                        file: options.outSourceMap,
+                        orig: inMap,
+                        root: options.sourceRoot
+                    });
+
+                    if (options.sourceMapIncludeSources) {
+                        for (var file in sourcesContent) {
+                            if (sourcesContent.hasOwnProperty(file)) {
+                                options.source_map.get().setSourceContent(file, sourcesContent[file]);
+                            }
+                        }
+                    }
+
+                }
+
+                if (options.output) {
+                    UglifyJS.merge(options.output,output);
+                }
+
+                var stream = UglifyJS.OutputStream(output);
+                toplevel.print(stream);
+                return {
+                    code : stream + "",
+                    map  : output.source_map + ""
+                };"""
 
         options = {
-            "source":source,
-            "generate_map":not not generate_map,
-            "compressor_options":self.compressor_options(),
-            "gen_code_options":self.gen_code_options(),
-            "mangle_options":self.mangle_options(),
-            "parse_options":self.parse_options(),
-            "source_map_options":self.source_map_options(),
-            "squeeze":self.should_squeeze(),
-            "mangle":self.should_mangle(),
-            "copyright":self.preserve_copyright(),
-            "compress": self._options['compress']
+            "inSourceMap": self._options['input_source_map'],
+            "outSourceMap": self._options['output_source_map'],
+            "sourceRoot": self._options['source_root'],
+            "warnings": self._options['warnings'],
+            "mangle": not not self._options['mangle'],
+            "output": self._options['output'],
+            "compress": self._options['compressor']
         }
 
-        response = self._context.exec_(js % json.dumps(options))
+        self._context.enter()
 
-        if not not generate_map:
-            response[0] = response[0].encode(self._options['encoding'])
-        else:
-            response = response.encode(self._options['encoding'])
+        #response = self._context.exec_(js % (json.dumps(source),json.dumps(options)))
+        js = js % (json.dumps(source),json.dumps(options))
+        response = self._context.eval("%s;\n%s" % (self.env,js))
+        response[u'code'] = response[u'code'].encode(self._options['encoding'])
 
         return response
-
-    def should_mangle(self):
-        return not not self._options['mangle']
-
-    def should_squeeze(self):
-        return not not self._options['squeeze']
-
-    def preserve_copyright(self):
-        return not not self._options['copyright']
-
-    def compressor_options(self):
-        return {
-            "sequences": self._options['seqs'],
-            "dead_code": self._options['dead_code'],
-            "unsafe": not self._options['unsafe'],
-            "hoist_vars": self._options['lift_vars'],
-            "global_defs": self._options['define'] or {}
-        }
-
-    def mangle_options(self):
-        return {
-            "except": self._options["except"],
-        }
-
-    def squeeze_options(self):
-        return {
-            "make_seqs": self._options["seqs"],
-            "dead_code": self._options["dead_code"],
-            "keep_comps": not self._options["unsafe"]
-        }
-
-    def gen_code_options(self):
-        options = {
-     		 	"ascii_only": self._options["ascii_only"],
-                "inline_script": self._options["inline_script"],
-                "quote_keys": self._options["quote_keys"],
-                "max_line_len": self._options["max_line_length"]
-        }
-
-        if self._options["beautify"]:
-            options.update({"beautify": True})
-            options.update(self._options["beautify_options"])
-
-        return options
-
-    def source_map_options(self):
-        return {
-            'file': self._options['output_filename'],
-            'root': self._options['source_root'],
-            'orig': self._options['input_source_map']
-        }
-
-
-    def parse_options(self):
-        return {
-                'filename': self._options['source_filename']
-                }
 
 # Minifies JavaScript code using implicit context.
 #
