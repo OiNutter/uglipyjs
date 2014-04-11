@@ -30,7 +30,6 @@ class UglipyJS:
             "max_line_len"  : 32000, # maximum line length (for non-beautified output)
             #"ie_proof"      : True,  # output IE-safe code?
             "beautify"      : False, # beautify output?
-            "source_map"    : None,  # output a source map
             "bracketize"    : False, # use brackets every time?
             "comments"      : False, # output comments?
             "semicolons"    : True   # use semicolons to separate statements? (otherwise, newlines)
