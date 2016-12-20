@@ -159,7 +159,8 @@ if (options.generate_map) {
             "dead_code": self._options['dead_code'],
             "unsafe": not self._options['unsafe'],
             "hoist_vars": self._options['lift_vars'],
-            "global_defs": self._options['define'] or {}
+            "global_defs": self._options['define'] or {},
+            "passes": 10
         }
 
     def mangle_options(self):
