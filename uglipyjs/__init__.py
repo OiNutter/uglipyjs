@@ -9,7 +9,8 @@ class UglipyJS:
 
     # Default options for compilation
     __DEFAULTS__ = {
-    	'encoding':'utf8',
+        'drop_console': False,
+        'encoding':'utf8',
         'mangle': True, # Mangle variable and function names, use :vars to skip function mangling
         'except': ["$super"], # Variable names to be excluded from mangling
         'max_line_length': 32 * 1024, # Maximum line length
@@ -36,7 +37,7 @@ class UglipyJS:
         'compress': {}
     }
 
-    source_path = os.path.join(os.path.dirname(__file__), 'uglify.js')
+    source_path = os.path.join(os.path.dirname(__file__), 'uglifyjs.js')
     source_map_path = os.path.join(os.path.dirname(__file__), 'source-map.min.js')
     es5_fallback_path = os.path.join(os.path.dirname(__file__), 'es5.js')
 
@@ -50,7 +51,7 @@ class UglipyJS:
         self._context = execjs.compile(
             io.open(UglipyJS.es5_fallback_path, "r",encoding=self._options['encoding']).read() + ";"
             + io.open(UglipyJS.source_map_path, "r",encoding=self._options['encoding']).read() + ";"
-			+ "var MOZ_SourceMap = this.sourceMap;"
+            + "var MOZ_SourceMap = this.sourceMap;"
             + io.open(UglipyJS.source_path, "r",encoding=self._options['encoding']).read()
         )
 
@@ -153,11 +154,13 @@ if (options.generate_map) {
 
     def compressor_options(self):
         return {
+            "drop_console": self._options['drop_console'],
             "sequences": self._options['seqs'],
             "dead_code": self._options['dead_code'],
             "unsafe": not self._options['unsafe'],
             "hoist_vars": self._options['lift_vars'],
-            "global_defs": self._options['define'] or {}
+            "global_defs": self._options['define'] or {},
+            "passes": 10
         }
 
     def mangle_options(self):
@@ -174,7 +177,7 @@ if (options.generate_map) {
 
     def gen_code_options(self):
         options = {
-     		 	"ascii_only": self._options["ascii_only"],
+                "ascii_only": self._options["ascii_only"],
                 "inline_script": self._options["inline_script"],
                 "quote_keys": self._options["quote_keys"],
                 "max_line_len": self._options["max_line_length"]
