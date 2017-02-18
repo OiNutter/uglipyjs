@@ -18,7 +18,7 @@ setup(name='UgliPyJS',
       package_data={
        	'uglipyjs': ['*.js'],
      },
-     requires=['PyV8','ordereddict','PyExecJS'],
+     requires=['ordereddict','PyExecJS'],
      license='MIT License',
      classifiers=[
         'Development Status :: 3 - Alpha',
